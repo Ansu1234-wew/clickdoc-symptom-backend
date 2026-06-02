@@ -5,14 +5,18 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+def get_openai_api_key():
+    """
+    Reads OpenAI API key at request time.
+    This works better on Railway after variables are added/redeployed.
+    """
+    return os.getenv("OPENAI_API_KEY")
 
 
 def _extract_output_text(result: dict) -> str:
     """
     Extract text safely from OpenAI Responses API result.
-    Some responses may not contain output_text directly,
-    so we also check the output array.
     """
 
     if not isinstance(result, dict):
@@ -22,7 +26,6 @@ def _extract_output_text(result: dict) -> str:
         return str(result["output_text"])
 
     output_items = result.get("output", [])
-
     extracted_parts = []
 
     for item in output_items:
@@ -68,14 +71,16 @@ def _call_openai_for_medical_json(prompt: str, schema_name: str, schema: dict):
     Calls OpenAI Responses API and forces JSON schema output.
     """
 
-    if not OPENAI_API_KEY:
+    openai_api_key = get_openai_api_key()
+
+    if not openai_api_key:
         return None, "OpenAI API key missing."
 
     try:
         response = requests.post(
             "https://api.openai.com/v1/responses",
             headers={
-                "Authorization": f"Bearer {OPENAI_API_KEY}",
+                "Authorization": f"Bearer {openai_api_key}",
                 "Content-Type": "application/json",
             },
             json={
@@ -102,7 +107,9 @@ def _call_openai_for_medical_json(prompt: str, schema_name: str, schema: dict):
         )
 
         if response.status_code != 200:
-            return None, f"OpenAI API failed: {response.status_code} - {response.text}"
+            return None, (
+                f"OpenAI API failed: {response.status_code} - {response.text}"
+            )
 
         result = response.json()
         output_text = _extract_output_text(result)
@@ -118,7 +125,11 @@ def _call_openai_for_medical_json(prompt: str, schema_name: str, schema: dict):
         return None, f"OpenAI request error: {str(e)}"
 
 
-def verify_model_prediction(symptoms: str, model_disease: str, confidence_percent: float):
+def verify_model_prediction(
+    symptoms: str,
+    model_disease: str,
+    confidence_percent: float,
+):
     """
     Used when model confidence is medium: 40% to 69%.
     ChatGPT checks whether model disease is medically plausible.
@@ -168,7 +179,7 @@ Rules:
     parsed, error = _call_openai_for_medical_json(
         prompt=prompt,
         schema_name="verify_model_prediction",
-        schema=schema
+        schema=schema,
     )
 
     if error or not parsed:
@@ -231,7 +242,7 @@ Rules:
     parsed, error = _call_openai_for_medical_json(
         prompt=prompt,
         schema_name="ai_fallback_prediction",
-        schema=schema
+        schema=schema,
     )
 
     if error or not parsed:

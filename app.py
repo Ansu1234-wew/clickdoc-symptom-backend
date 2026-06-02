@@ -4,6 +4,7 @@ from pydantic import BaseModel
 import pickle
 import re
 import numpy as np
+import os
 
 from roman_urdu_map import normalize_roman_urdu
 from symptom_anchor import SYMPTOM_ANCHORS
@@ -78,6 +79,14 @@ def health():
         "vectorizer_loaded": True
     }
 
+@app.get("/check-openai-key")
+def check_openai_key():
+    key = os.getenv("OPENAI_API_KEY")
+
+    return {
+        "openai_key_found": bool(key),
+        "key_length": len(key) if key else 0
+    }
 
 @app.post("/predict")
 def predict(data: InputData):
